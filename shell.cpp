@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <assert.h>
 #include <fcntl.h>
 #include <iostream>
 #include <sys/wait.h>
@@ -33,6 +34,47 @@ char** const convertArgsForExec(const std::vector<std::string>& cmd_args) {
 	return args;
 }
 
+/* Pipe hierarchy is laid out from last cmd -> first. */
+void pipeAndExecRec(std::vector<program_cmd_t>& parsed_cmd, int pos) {
+	assert(pos >= 0);
+	auto cmd = parsed_cmd[pos];
+	auto args = convertArgsForExec(cmd.args);
+	adjustForRedirect(cmd);
+
+	if (pos == 0) {
+		execvp(cmd.program_exec.c_str(), args);
+		free(args);
+		exit(EXIT_SUCCESS);
+	}
+
+	int pipefd[2];
+	if (pipe(pipefd) == -1) {
+		perror("pipe");
+		exit(EXIT_FAILURE);
+	}
+
+	pid_t pid = fork();
+
+	if (pid == 0) {
+		close(pipefd[0]);
+		int dup_res = dup2(pipefd[1], STDOUT_FILENO);
+		close(pipefd[1]);
+		pipeAndExecRec(parsed_cmd, pos - 1);
+	} else {
+		close(pipefd[1]);
+		int dup_res = dup2(pipefd[0], STDIN_FILENO);
+		close(pipefd[0]);
+
+		int status;
+		wait(&status);
+		std::cout << " STATUS FROM POS " << pos << ": " << status << std::endl;
+
+		execvp(cmd.program_exec.c_str(), args);
+		free(args);
+		exit(EXIT_SUCCESS);
+	}
+}
+
 bool readCmd(std::string& cmd) {
 	std::cout << "Shell: ";
 	std::getline(std::cin, cmd);
@@ -50,16 +92,9 @@ int main() {
 		auto parsed_cmd = Parser::getParsedCmd(cmd);
 		// Parser::printParsedCmd(parsed_cmd);
 
-		program_cmd_t cmd = parsed_cmd[0];
-
 		pid_t pid = fork();
 		if (pid == 0) {
-			auto args = convertArgsForExec(cmd.args);
-			adjustForRedirect(cmd);
-
-			execvp(cmd.program_exec.c_str(), args);
-			free(args);
-			exit(0);
+			pipeAndExecRec(parsed_cmd, parsed_cmd.size() - 1);
 		} else {
 			int status;
 			wait(&status);
