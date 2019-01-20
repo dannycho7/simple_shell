@@ -10,14 +10,26 @@
 void adjustForRedirect(program_cmd_t cmd) {
 	if (cmd.does_redirect_files[0]) {
 		int rd_fd = open(cmd.redirect_files[0].c_str(), O_RDONLY);
-		int dup_res = dup2(rd_fd, STDIN_FILENO);
+		if (rd_fd == -1) {
+			perror(cmd.redirect_files[0].c_str());
+			exit(errno);
+		}
+		if (dup2(rd_fd, STDIN_FILENO)) {
+			perror("dup2 on read redirect");
+		}
 		close(rd_fd);
 	}
 
 	if (cmd.does_redirect_files[1]) {
 		mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
 		int wrt_fd = open(cmd.redirect_files[1].c_str(), O_WRONLY|O_CREAT|O_TRUNC, mode);
-		int dup_res = dup2(wrt_fd, STDOUT_FILENO);
+		if (wrt_fd == -1) {
+			perror(cmd.redirect_files[0].c_str());
+			exit(errno);
+		}
+		if (dup2(wrt_fd, STDOUT_FILENO) == -1) {
+			perror("dup2 on write redirect");
+		}
 		close(wrt_fd);
 	}
 }
@@ -34,17 +46,24 @@ char** const convertArgsForExec(const std::vector<std::string>& cmd_args) {
 	return args;
 }
 
+void runCmd(program_cmd_t cmd) {
+	auto args = convertArgsForExec(cmd.args);
+	adjustForRedirect(cmd);
+	if (execvp(cmd.program_exec.c_str(), args) == -1) {
+		perror(cmd.program_exec.c_str());
+		exit(errno);
+	}
+	free(args);
+	exit(EXIT_SUCCESS);
+}
+
 /* Pipe hierarchy is laid out from last cmd -> first. */
 void pipeAndExecRec(std::vector<program_cmd_t>& parsed_cmd, int pos) {
 	assert(pos >= 0);
 	auto cmd = parsed_cmd[pos];
-	auto args = convertArgsForExec(cmd.args);
-	adjustForRedirect(cmd);
-
+	
 	if (pos == 0) {
-		execvp(cmd.program_exec.c_str(), args);
-		free(args);
-		exit(EXIT_SUCCESS);
+		runCmd(cmd);
 	}
 
 	int pipefd[2];
@@ -69,9 +88,7 @@ void pipeAndExecRec(std::vector<program_cmd_t>& parsed_cmd, int pos) {
 		wait(&status);
 		std::cout << " STATUS FROM POS " << pos << ": " << status << std::endl;
 
-		execvp(cmd.program_exec.c_str(), args);
-		free(args);
-		exit(EXIT_SUCCESS);
+		runCmd(cmd);
 	}
 }
 
