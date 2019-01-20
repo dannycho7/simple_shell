@@ -26,7 +26,7 @@ namespace Parser {
 			int token_end_i = program_cmd.find_first_of(">< ", token_start_i);
 			start_pos = token_end_i;
 
-			return program_cmd.substr(token_start_i, token_end_i - token_start_i + 1);
+			return program_cmd.substr(token_start_i, token_end_i - token_start_i);
 		}
 	}
 
