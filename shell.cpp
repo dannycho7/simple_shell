@@ -111,6 +111,7 @@ int main() {
 	std::string cmd;
 	signal(SIGCHLD, cmd_handler);
 	while (readCmd(cmd)) {
+		if (cmd == "") continue;
 		bool background = (cmd.back() == '&');
 		if (background) {
 			cmd = cmd.substr(0, cmd.length() - 1);
