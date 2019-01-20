@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <iostream>
+#include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
@@ -98,8 +99,17 @@ bool readCmd(std::string& cmd) {
 	return !std::cin.eof();
 }
 
+void cmd_handler(int sig) {
+	int status;
+	pid_t pid = waitpid(-1, &status, WNOHANG);
+	if (pid > 0) {
+		std::cout << "Pid " << pid << " exited with status " << status << "." << std::endl;		
+	}
+}
+
 int main() {
 	std::string cmd;
+	signal(SIGCHLD, cmd_handler);
 	while (readCmd(cmd)) {
 		bool background = (cmd.back() == '&');
 		if (background) {
@@ -113,9 +123,10 @@ int main() {
 		if (pid == 0) {
 			pipeAndExecRec(parsed_cmd, parsed_cmd.size() - 1);
 		} else {
-			int status;
-			wait(&status);
-			std::cout << " STATUS: " << status << std::endl;
+			if (!background) {
+				int status;
+				wait(&status);
+			}
 		}
 	}
 }
