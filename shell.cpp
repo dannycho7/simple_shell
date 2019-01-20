@@ -87,7 +87,6 @@ void pipeAndExecRec(std::vector<program_cmd_t>& parsed_cmd, int pos) {
 
 		int status;
 		wait(&status);
-		std::cout << " STATUS FROM POS " << pos << ": " << status << std::endl;
 
 		runCmd(cmd);
 	}
@@ -103,7 +102,7 @@ void cmd_handler(int sig) {
 	int status;
 	pid_t pid = waitpid(-1, &status, WNOHANG);
 	if (pid > 0) {
-		std::cout << "Pid " << pid << " exited with status " << status << "." << std::endl;		
+		std::cerr << "Pid " << pid << " exited with status " << status << "." << std::endl;		
 	}
 }
 
