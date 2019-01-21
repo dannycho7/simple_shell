@@ -119,6 +119,15 @@ int main() {
 		auto parsed_cmd = Parser::getParsedCmd(cmd);
 		// Parser::printParsedCmd(parsed_cmd);
 
+		if (parsed_cmd.size() == 1 && parsed_cmd.front().program_exec == "cd") {
+			/* Special case of cd. Uses chdir syscall to actually change working directory */
+			std::string cd_path = parsed_cmd.front().args[1];
+			if (chdir(cd_path.c_str()) == -1) {
+				perror(("ERROR: cd" + cd_path).c_str());
+			}
+			continue;	
+		}
+
 		pid_t pid = fork();
 		if (pid == 0) {
 			pipeAndExecRec(parsed_cmd, parsed_cmd.size() - 1);
