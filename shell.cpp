@@ -92,8 +92,8 @@ void pipeAndExecRec(std::vector<program_cmd_t>& parsed_cmd, int pos) {
 	}
 }
 
-bool readCmd(std::string& cmd) {
-	std::cout << "Shell: ";
+bool readCmd(std::string& cmd, bool silent_prompt) {
+	if (!silent_prompt) std::cout << "Shell: ";
 	std::getline(std::cin, cmd);
 	return !std::cin.eof();
 }
@@ -106,10 +106,14 @@ void cmd_handler(int sig) {
 	}
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+	bool silent_prompt = false;
+	if (argc == 2 && strcmp(argv[1], "-n") == 0) {
+		silent_prompt = true;
+	}
 	std::string cmd;
 	signal(SIGCHLD, cmd_handler);
-	while (readCmd(cmd)) {
+	while (readCmd(cmd, silent_prompt)) {
 		if (cmd == "") continue;
 		bool background = (cmd.back() == '&');
 		if (background) {
