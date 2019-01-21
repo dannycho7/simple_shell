@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <assert.h>
+#include <cstring>
 #include <fcntl.h>
 #include <iostream>
 #include <signal.h>
