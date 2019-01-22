@@ -98,6 +98,10 @@ bool readCmd(std::string& cmd, bool silent_prompt) {
 	return !std::cin.eof();
 }
 
+static int redirect_stderr_fd;
+static std::function<void(int)> cmd_handler_wrap_fd;
+void cmd_handler_wrapper(int sig) { cmd_handler_wrap_fd(sig); }
+
 void cmd_handler(int sig, int child_stderr_fd) {
 	int status;
 	pid_t pid = waitpid(-1, &status, WNOHANG);
@@ -106,13 +110,13 @@ void cmd_handler(int sig, int child_stderr_fd) {
 		if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
 			char err[512];
 			fgets(err, 512, fdopen(child_stderr_fd, "r"));
-			std::cerr << "ERROR: " << err;
+			std::string err_s(err);
+			err_s = "ERROR: " + err_s;
+
+			write(redirect_stderr_fd, err_s.c_str(), err_s.length());
 		}	
 	}
 }
-
-static std::function<void(int)> cmd_handler_wrap_fd;
-void cmd_handler_wrapper(int sig) { cmd_handler_wrap_fd(sig); }
 
 int main(int argc, char* argv[]) {
 	bool silent_prompt = false;
@@ -150,6 +154,11 @@ int main(int argc, char* argv[]) {
 
 		pid_t pid = fork();
 		if (pid == 0) {
+			redirect_stderr_fd = dup(STDERR_FILENO);
+			if (redirect_stderr_fd == -1) {
+				perror("ERROR");
+				exit(EXIT_FAILURE);
+			}
 			dup2(stderr_pipefd[1], STDERR_FILENO);
 			close(stderr_pipefd[1]);
 			pipeAndExecRec(parsed_cmd, parsed_cmd.size() - 1);
