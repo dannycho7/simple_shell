@@ -184,7 +184,7 @@ int main(int argc, char* argv[]) {
 		} else {
 			if (!background) {
 				int status;
-				wait(&status);
+				waitpid(pid, &status, 0);
 				cmd::handleExit(status);
 			}
 		}
