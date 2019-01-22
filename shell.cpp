@@ -14,11 +14,11 @@ void adjustForRedirect(program_cmd_t cmd) {
 	if (cmd.does_redirect_files[0]) {
 		int rd_fd = open(cmd.redirect_files[0].c_str(), O_RDONLY);
 		if (rd_fd == -1) {
-			perror(("ERROR: " + cmd.redirect_files[0]).c_str());
+			perror(("ERROR"));
 			exit(errno);
 		}
 		if (dup2(rd_fd, STDIN_FILENO)) {
-			perror("ERROR: dup2 on read redirect");
+			perror("ERROR");
 		}
 		close(rd_fd);
 	}
@@ -27,11 +27,11 @@ void adjustForRedirect(program_cmd_t cmd) {
 		mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
 		int wrt_fd = open(cmd.redirect_files[1].c_str(), O_WRONLY|O_CREAT|O_TRUNC, mode);
 		if (wrt_fd == -1) {
-			perror(("ERROR: " + cmd.redirect_files[0]).c_str());
+			perror(("ERROR"));
 			exit(errno);
 		}
 		if (dup2(wrt_fd, STDOUT_FILENO) == -1) {
-			perror("ERROR: dup2 on write redirect");
+			perror("ERROR");
 		}
 		close(wrt_fd);
 	}
@@ -53,7 +53,7 @@ void runCmd(program_cmd_t cmd) {
 	auto args = convertArgsForExec(cmd.args);
 	adjustForRedirect(cmd);
 	if (execvp(cmd.program_exec.c_str(), args) == -1) {
-		perror(("ERROR: " + cmd.program_exec).c_str());
+		perror(("ERROR"));
 		exit(errno);
 	}
 	free(args);
@@ -71,7 +71,7 @@ void pipeAndExecRec(std::vector<program_cmd_t>& parsed_cmd, int pos) {
 
 	int pipefd[2];
 	if (pipe(pipefd) == -1) {
-		perror("ERROR: pipe");
+		perror("ERROR");
 		exit(EXIT_FAILURE);
 	}
 
@@ -126,7 +126,7 @@ int main(int argc, char* argv[]) {
 	std::string cmd;
 	int stderr_pipefd[2] = { 0, 0 };
 	if (pipe(stderr_pipefd) == -1) {
-		perror("ERROR: pipe");
+		perror("ERROR");
 		exit(EXIT_FAILURE);
 	}
 
@@ -147,7 +147,7 @@ int main(int argc, char* argv[]) {
 			/* Special case of cd. Uses chdir syscall to actually change working directory */
 			std::string cd_path = parsed_cmd.front().args[1];
 			if (chdir(cd_path.c_str()) == -1) {
-				perror(("ERROR: cd" + cd_path).c_str());
+				perror(("ERROR"));
 			}
 			continue;	
 		}
