@@ -27,9 +27,9 @@ namespace cmd {
 	}
 
 	void handleExit(int status) {
-		if (WIFEXITED(status) && WEXITSTATUS(status) == 1) {
+		if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
 			char err[512];
-			fgets(err, 512, fdopen(child_stderr_fd, "r"));
+			if (fgets(err, 512, fdopen(child_stderr_fd, "r")) == nullptr) return;
 			std::string err_s(err);
 			err_s = "ERROR: " + err_s;
 
@@ -146,6 +146,10 @@ int main(int argc, char* argv[]) {
 		exit(EXIT_FAILURE);
 	}
 	cmd::child_stderr_fd = stderr_pipefd[0];
+	int flags = fcntl(cmd::child_stderr_fd, F_GETFL);
+	flags |= O_NONBLOCK;
+	fcntl(cmd::child_stderr_fd, F_SETFL, flags);
+
 	signal(SIGCHLD, cmd::handler);
 	cmd::redirect_stderr_fd = dup(STDERR_FILENO);
 	if (cmd::redirect_stderr_fd == -1) {
