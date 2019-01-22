@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <assert.h>
+#include <cstdio>
 #include <cstring>
 #include <fcntl.h>
 #include <iostream>
@@ -78,17 +79,15 @@ void pipeAndExecRec(std::vector<program_cmd_t>& parsed_cmd, int pos) {
 
 	if (pid == 0) {
 		close(pipefd[0]);
-		int dup_res = dup2(pipefd[1], STDOUT_FILENO);
+		dup2(pipefd[1], STDOUT_FILENO);
 		close(pipefd[1]);
 		pipeAndExecRec(parsed_cmd, pos - 1);
 	} else {
 		close(pipefd[1]);
-		int dup_res = dup2(pipefd[0], STDIN_FILENO);
+		dup2(pipefd[0], STDIN_FILENO);
 		close(pipefd[0]);
 
-		int status;
-		wait(&status);
-
+		wait(NULL);
 		runCmd(cmd);
 	}
 }
@@ -99,13 +98,21 @@ bool readCmd(std::string& cmd, bool silent_prompt) {
 	return !std::cin.eof();
 }
 
-void cmd_handler(int sig) {
+void cmd_handler(int sig, int child_stderr_fd) {
 	int status;
 	pid_t pid = waitpid(-1, &status, WNOHANG);
 	if (pid > 0) {
-		std::cerr << "Pid " << pid << " exited with status " << status << "." << std::endl;		
+		std::cerr << "Pid " << pid << " exited with status " << status << "." << std::endl;
+		if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+			char err[512];
+			fgets(err, 512, fdopen(child_stderr_fd, "r"));
+			std::cerr << "ERROR: " << err;
+		}	
 	}
 }
+
+static std::function<void(int)> cmd_handler_wrap_fd;
+void cmd_handler_wrapper(int sig) { cmd_handler_wrap_fd(sig); }
 
 int main(int argc, char* argv[]) {
 	bool silent_prompt = false;
@@ -113,7 +120,15 @@ int main(int argc, char* argv[]) {
 		silent_prompt = true;
 	}
 	std::string cmd;
-	signal(SIGCHLD, cmd_handler);
+	int stderr_pipefd[2] = { 0, 0 };
+	if (pipe(stderr_pipefd) == -1) {
+		perror("ERROR: pipe");
+		exit(EXIT_FAILURE);
+	}
+
+	cmd_handler_wrap_fd = [&](int sig) { cmd_handler(sig, stderr_pipefd[0]); };
+	signal(SIGCHLD, cmd_handler_wrapper);
+
 	while (readCmd(cmd, silent_prompt)) {
 		if (cmd == "") continue;
 		bool background = (cmd.back() == '&');
@@ -135,11 +150,12 @@ int main(int argc, char* argv[]) {
 
 		pid_t pid = fork();
 		if (pid == 0) {
+			dup2(stderr_pipefd[1], STDERR_FILENO);
+			close(stderr_pipefd[1]);
 			pipeAndExecRec(parsed_cmd, parsed_cmd.size() - 1);
 		} else {
 			if (!background) {
-				int status;
-				wait(&status);
+				wait(NULL);
 			}
 		}
 	}
