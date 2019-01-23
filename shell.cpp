@@ -158,6 +158,8 @@ int main(int argc, char* argv[]) {
 	}
 	dup2(stderr_pipefd[1], STDERR_FILENO);
 	close(stderr_pipefd[1]);
+	
+	signal(SIGINT, SIG_IGN);
 
 	while (cmd::read(cmd, silent_prompt)) {
 		if (cmd == "") continue;
@@ -180,6 +182,7 @@ int main(int argc, char* argv[]) {
 
 		pid_t pid = fork();
 		if (pid == 0) {
+			if (!background) signal(SIGINT, SIG_DFL);
 			pipeAndExecRec(parsed_cmd, parsed_cmd.size() - 1);
 		} else {
 			if (!background) {
