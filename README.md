@@ -1,7 +1,3 @@
-I worked alone.
-Name: Hyun Bum Cho
-Perm Number: 4195368
-
 # Simple Shell
 
 This is a simple shell built with C++.
